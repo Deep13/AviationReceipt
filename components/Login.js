@@ -38,7 +38,7 @@ const Login = ({ navigation }) => {
             console.log(user.uid);
             setlogUser(user.email)
             firestore().collection('users_access').doc(user.uid).get().then(document => {
-                console.log(document.data().url);
+                // console.log(document.data().url);
                 setloading(false);
                 domain.current = document.data().url;
                 setDomain(document.data().url);
