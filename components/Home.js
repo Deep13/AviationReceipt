@@ -1,58 +1,118 @@
 import { View, Text, TouchableOpacity, ScrollView, Modal, Dimensions, TextInput, StatusBar, Image, StyleSheet, Alert } from 'react-native'
 import React, { useState, useRef, useEffect } from 'react'
 const { width, height } = Dimensions.get('window');
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import auth from '@react-native-firebase/auth';
-import RBSheet from 'react-native-raw-bottom-sheet';
 import * as ImagePicker from 'react-native-image-picker';
 import Icons from 'react-native-vector-icons/MaterialCommunityIcons';
+import IconsFont from 'react-native-vector-icons/FontAwesome';
+import IconsFontM from 'react-native-vector-icons/MaterialIcons';
 import RNFetchBlob from 'rn-fetch-blob';
 import { getDomain, getUser } from './functions/helper';
-
+import DatePicker from 'react-native-date-picker'
 import Loader from './Loader';
+import DocumentPicker from 'react-native-document-picker';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
 
-const Home = ({ navigation }) => {
-    const refRBSheet = useRef();
+
+const Home = ({ navigation, route }) => {
     const vendor = getUser();
-    console.log(vendor)
+    const { receipt } = route.params;
     const [loading, setloading] = useState(false);
     const [modalVisibleCurrency, setmodalVisibleCurrency] = useState(false);
+    const [modalVisibleCurrencyClaim, setmodalVisibleCurrencyClaim] = useState(false);
     const [modalVisibleSuccess, setmodalVisibleSuccess] = useState(false);
     const [modalVisiblePayment, setmodalVisiblePayment] = useState(false);
     const [currency, setcurrency] = useState([]);
-    const [selCurr, setselCurr] = useState({
-        ID: "91",
-        LOOKUP_CODE: "SGD",
-        LOOKUP_DESC: "SINGAPORE DOLLAR",
-        Rates: {
-            DEFAULT_RATE: "1",
-            ID: "1",
-            RATE: "1.0000"
+    const [date, setDate] = useState(new Date())
+    const [open, setOpen] = useState(false);
+    const [Remove, setRemove] = useState(false);
+    const [receiptModal, setreceiptModal] = useState({
+        "ReceiptParameters": {
+            "REC_DATE": "",
+            "INVOICE_DOC": "",
+            "PAY_MODE": "",
+            "PAY_MODE_TEXT": "",
+            "EXCH_ID": "",
+            "EXCH_ID_TEXT": "",
+            "EXCH_RATE": "0",
+            "UID": "",
+            "INV_NO": "",
+            "INV_TYPE": "0",
+            "VENDOR_ID": vendor.ID,
+            "REMARK": "",
+            "OPCO": "3",
+            "STATUS": "0",
+            "EXCH_COST": "",
+            "UPDATE_BY": vendor.user,
+            "UploadDocs": []
+        },
+        "ReceiptDetailParameters": {
+            "UID": "",
+            "DESCRIPTION": "",
+            "UNIT_COST": "",
+            "EXCH_ID": "",
+            "EXCH_RATE": "",
+            "EXCH_ID_TEXT": ""
         }
-    });
-    const [selPayment, setselPayment] = useState({
-        ID: "64",
-        LOOKUP_CODE: "CA",
-        LOOKUP_DESC: "CASH"
-    });
-    const [expDesc, setexpDesc] = useState(null);
-    const [amount, setamount] = useState(null);
-    const [invoice_doc, setinvoice_doc] = useState(null);
+    })
     const [payment, setpayment] = useState([]);
-    const onLogOut = () => {
-        AsyncStorage.removeItem('username');
-        AsyncStorage.removeItem('password');
-        auth().signOut();
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'ClientSign' }],
-        });
+    const onRemove = () => {
+        if (receipt && receipt.COMPLETED != 0) {
+            Alert.alert("You cannot remove this completed receipt");
+            setRemove(false)
+            return;
+        }
+        setloading(true);
+        var domain = getDomain();
+        var myHeaders = new Headers();
+        myHeaders.append('Accept', 'application/json');
+        myHeaders.append("Content-Type", "application/json");
+        console.log("delete", JSON.stringify({
+            "token": "348EF663-2D24-4E96-BA1C-6B7AD98A44C2",
+            "username": vendor.USERNAME,
+            "ReceiptList": [{
+                "uid": receipt.UID,
+                "inv_no": receipt.INV_NO
+            }
+            ]
+        }))
+        var requestOptions = {
+            method: 'POST',
+            headers: myHeaders,
+            body: JSON.stringify({
+                "token": "348EF663-2D24-4E96-BA1C-6B7AD98A44C2",
+                "username": vendor.USERNAME,
+                "ReceiptList": [{
+                    "uid": receipt.UID,
+                    "inv_no": receipt.INV_NO
+                }
+                ]
+            })
+        };
+        fetch(
+            `${domain}/DeleteReceipt`,
+            requestOptions,
+        )
+            .then(response => response.text())
+            .then(result => {
+                setloading(false);
+                reset();
+                navigation.replace("Receipts")
+                //   sethasUnsavedChanges(false)
+            })
+            .catch(error => {
+                setloading(false);
+                Alert.alert('Error in updating');
+                console.log(error, 'Function error');
+            });
     };
-    const getImage = async type => {
-        // console.log('HERE', uploadSection);
+
+    // const convertDateString = (date) =>{
+    //     return 
+    // }
+    const getImage = async (type) => {
         var options = {
             mediaType: 'image',
-            includeBase64: false,
+            includeBase64: true,
             maxHeight: 800,
             maxWidth: 800,
         };
@@ -60,21 +120,30 @@ const Home = ({ navigation }) => {
         switch (type) {
             case true:
                 try {
-                    options.mediaType = 'photo';
-                    const result = await ImagePicker.launchImageLibrary(options);
+                    const result = await ImagePicker.launchCamera(options);
                     console.log(result)
                     const file = result.assets[0];
-
-                    onPressDocPreA_New(file);
+                    var doc = {
+                        "filename": file.fileName.split(".")[0],
+                        "b64": 'data:' + file.type + ';base64,' + file.base64,
+                        "fileExtension": file.type.split("/")[1]
+                    };
+                    var oldReceipt = { ...receiptModal };
+                    oldReceipt.ReceiptParameters.UploadDocs.push(doc);
+                    setreceiptModal({ ...oldReceipt })
                 } catch (error) {
                     console.log(error);
                 }
                 break;
             case false:
                 try {
-                    const result = await ImagePicker.launchCamera(options);
-                    const file = result.assets[0];
-                    onPressDocPreA_New(file);
+
+                    const res = await DocumentPicker.pickSingle({
+                        type: [DocumentPicker.types.images, DocumentPicker.types.pdf],
+                    });
+
+                    // console.log("doc", res);
+                    onPressDocPreA_New(res);
                 } catch (error) {
                     console.log(error);
                 }
@@ -82,6 +151,7 @@ const Home = ({ navigation }) => {
             default:
                 break;
         }
+
     };
     const onPressDocPreA_New = async (res) => {
         setloading(false);
@@ -89,7 +159,17 @@ const Home = ({ navigation }) => {
             .readFile(res.uri, 'base64')
             .then(encoded => {
                 setloading(false);
-                setinvoice_doc('data:' + res.type + ';base64,' + encoded);
+                // console.log('data:' + res.type + ';base64,' + encoded);
+
+                var doc = {
+                    "filename": res.name.split(".")[0],
+                    "b64": 'data:' + res.type + ';base64,' + encoded,
+                    "fileExtension": res.type.split("/")[1]
+                };
+                var oldReceipt = { ...receiptModal };
+                oldReceipt.ReceiptParameters.UploadDocs.push(doc);
+                setreceiptModal({ ...oldReceipt })
+                console.log(receiptModal);
             })
             .catch(error => {
                 setloading(false);
@@ -98,7 +178,184 @@ const Home = ({ navigation }) => {
 
         // refRBSheet.current.close();
     };
+
+    const saveFile = (val, fileName) => {
+        const DownloadDir =
+            Platform.OS == 'ios'
+                ? RNFetchBlob.fs.dirs.DocumentDir
+                : RNFetchBlob.fs.dirs.DownloadDir + '/Aviation_Receipt';
+        const headers = {
+            'data:image/png;base64': '.png',
+            'data:image/jpeg;base64': '.jpg',
+            'data:application/pdf;base64': '.pdf'
+            // Add more checks for other file types as needed
+        };
+        var type = headers[val.split(",")[0]];
+        var bs64 = val.split(",")[1];
+        var pdfLocation = DownloadDir + '/' + fileName + type;
+        // console.log(pdfLocation);
+        // console.log(val)
+        RNFetchBlob.fs
+            .isDir(DownloadDir)
+            .then(isDir => {
+                if (isDir) {
+                    console.log('iSDir');
+                    RNFetchBlob.fs
+                        .writeFile(pdfLocation, bs64, 'base64')
+                        .then(res => {
+                            // console.log('saved', res);
+                            Alert.alert('Saved', 'Document has been saved in Downloads/Aviation_Receipt folder', [
+                                {
+                                    text: 'View', onPress: () => {
+                                        // console.log(pdfLocation, val.split(',')[0].split(';')[0].split(':')[1])
+                                        RNFetchBlob.android.actionViewIntent(pdfLocation, val.split(',')[0].split(';')[0].split(':')[1]);
+                                    }
+                                },
+                                { text: 'OK' },
+                            ])
+                        })
+                        .catch(err => {
+                            console.log(err)
+                            Alert.alert('Error in saving file')
+                        });
+                } else {
+                    RNFetchBlob.fs
+                        .mkdir(DownloadDir)
+                        .then(() => {
+                            console.log('Created Folder');
+                            RNFetchBlob.fs
+                                .writeFile(pdfLocation, bs64, 'base64')
+                                .then(res => {
+                                    console.log('saved');
+                                    Alert.alert('Saved', 'Document has been saved in Downloads/Aviation_receipt folder', [
+                                        {
+                                            text: 'View', onPress: () => {
+                                                // console.log(pdfLocation, val.split(',')[0].split(';')[0].split(':')[1])
+                                                RNFetchBlob.android.actionViewIntent(pdfLocation, val.split(',')[0].split(';')[0].split(':')[1]);
+                                            }
+                                        },
+                                        { text: 'OK' },
+                                    ])
+                                })
+                                .catch(err => {
+                                    Alert.alert('Error in saving file')
+                                });
+                        })
+                        .catch(err => {
+                            console.log('is Not dir', err);
+                            Alert.alert('Error in saving file')
+                        });
+                }
+            })
+            .catch(err => {
+                Alert.alert('Error in saving file')
+            });
+    }
+
+
+
     useEffect(() => {
+        if (receipt) {
+            setloading(true);
+            var domain = getDomain();
+            // var domain = 'https://demo.vellas.net:94/arrowdemoapi_dev/api/Values';
+            const url = `${domain}/GetReceiptDetail?_token=b95909e1-d33f-469f-90c6-5a2fb1e5627c&UID=${receipt.UID}`;
+            console.log(url);
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    // setloading(false);
+                    // console.log(data, "detail")
+                    if (data && data.length > 0) {
+                        const url2 = `${domain}/GetReceiptFiles?_token=b95909e1-d33f-469f-90c6-5a2fb1e5627c&UID=${receipt.UID}`;
+                        fetch(url2)
+                            .then(res => res.json())
+                            .then(dataFIle => {
+                                setloading(false);
+                                // console.log(dataFIle, "files")
+                                // if (dataFIle && dataFIle.length > 0) {
+                                // setreceiptList(data)
+                                // console.log({
+                                //     receipt: { ...receipt },
+                                //     detail: { ...data[0] }
+                                // })
+                                setreceiptModal({
+                                    "ReceiptParameters": {
+                                        "REC_DATE": receipt.REC_DATE,
+                                        "INVOICE_DOC": receipt.INVOICE_DOC,
+                                        "PAY_MODE": receipt.PAY_MODE,
+                                        "PAY_MODE_TEXT": receipt.PAY_MODE_DESC,
+                                        "EXCH_ID": receipt.EXCH_ID,
+                                        "EXCH_ID_TEXT": receipt.EXCH_DESC,
+                                        "EXCH_RATE": receipt.EXCH_RATE.toString(),
+                                        "UID": receipt.UID,
+                                        "INV_NO": receipt.INV_NO,
+                                        "INV_TYPE": receipt.INV_TYPE,
+                                        "VENDOR_ID": receipt.VENDOR_ID,
+                                        "REMARK": receipt.REMARK,
+                                        "OPCO": "3",
+                                        "STATUS": "0",
+                                        "UPDATE_BY": receipt.UPDATE_BY,
+                                        "EXCH_COST": receipt.EXCH_COST.toString(),
+                                        "UploadDocs": dataFIle.length > 0 ? dataFIle : []
+                                    },
+                                    "ReceiptDetailParameters": {
+                                        "UID": data[0].UID,
+                                        "DESCRIPTION": data[0].DESC_ENG,
+                                        "UNIT_COST": receipt.TOTAL_AMOUNT,
+                                        "EXCH_ID": data[0].CUR_ID,
+                                        "EXCH_RATE": data[0].CUR_RATE.toString(),
+                                        "EXCH_ID_TEXT": data[0].CURRENCY_DESC
+                                    }
+                                });
+
+                                // }
+
+
+                            })
+                            .catch(e => {
+                                console.log(e, 'Function error');
+                                setloading(false);
+                            })
+                    }
+
+                })
+                .catch(e => {
+                    console.log(e, 'Function error');
+                    setloading(false);
+                })
+        }
+        else {
+            setreceiptModal({
+                "ReceiptParameters": {
+                    "REC_DATE": "",
+                    "INVOICE_DOC": "",
+                    "PAY_MODE": "",
+                    "PAY_MODE_TEXT": "",
+                    "EXCH_ID": "",
+                    "EXCH_ID_TEXT": "",
+                    "EXCH_RATE": "0",
+                    "UID": "",
+                    "INV_NO": "",
+                    "INV_TYPE": "0",
+                    "VENDOR_ID": vendor.ID,
+                    "REMARK": "",
+                    "OPCO": "3",
+                    "STATUS": "0",
+                    "UPDATE_BY": vendor.user,
+                    "UploadDocs": [],
+                    "EXCH_COST": ""
+                },
+                "ReceiptDetailParameters": {
+                    "UID": "",
+                    "DESCRIPTION": "",
+                    "UNIT_COST": "",
+                    "EXCH_ID": "",
+                    "EXCH_RATE": "",
+                    "EXCH_ID_TEXT": ""
+                }
+            })
+        }
         fetchInitialValues();
     }, []);
 
@@ -131,93 +388,94 @@ const Home = ({ navigation }) => {
             })
     }
     const reset = () => {
-        setamount(null);
-        setexpDesc(null);
-        setinvoice_doc(null);
-        setselCurr({
-            ID: "91",
-            LOOKUP_CODE: "SGD",
-            LOOKUP_DESC: "SINGAPORE DOLLAR",
-            Rates: {
-                DEFAULT_RATE: "1",
-                ID: "1",
-                RATE: "1.0000"
+        setreceiptModal({
+            "ReceiptParameters": {
+                "REC_DATE": "",
+                "INVOICE_DOC": "",
+                "PAY_MODE": "",
+                "PAY_MODE_TEXT": "",
+                "EXCH_ID": "",
+                "EXCH_ID_TEXT": "",
+                "EXCH_RATE": "0",
+                "UID": "",
+                "INV_NO": "",
+                "INV_TYPE": "0",
+                "VENDOR_ID": vendor.ID,
+                "REMARK": "",
+                "OPCO": "3",
+                "STATUS": "0",
+                "UPDATE_BY": vendor.user,
+                "UploadDocs": [],
+                "EXCH_COST": ""
+            },
+            "ReceiptDetailParameters": {
+                "UID": "",
+                "DESCRIPTION": "",
+                "UNIT_COST": "",
+                "EXCH_ID": "",
+                "EXCH_RATE": "",
+                "EXCH_ID_TEXT": ""
             }
-        });
-        setselPayment({
-            ID: "64",
-            LOOKUP_CODE: "CA",
-            LOOKUP_DESC: "CASH"
-        });
+        })
     }
     const submit = () => {
-
-        if (!expDesc) {
-            Alert.alert('Enter Expense description');
-            return;
-
-        }
-        if (!amount) {
-            Alert.alert('Enter Amount');
+        if (receipt && receipt.COMPLETED != 0) {
+            Alert.alert("You cannot edit this completed receipt");
             return;
         }
-        if (!invoice_doc) {
-            Alert.alert('No invoice uploaded', 'Do you still want to proceed?', [
-                {
-                    text: 'No',
-                    onPress: () => console.log('Cancel Pressed'),
-                    style: 'cancel',
-                },
-                { text: 'Yes', onPress: () => postData() },
-            ]);
+        console.log(receiptModal);
+        var oReceipt = ["REC_DATE",
+            "INVOICE_DOC",
+            "PAY_MODE",
+            "EXCH_ID"];
+        for (i = 0; i < oReceipt.length; i++) {
+            console.log(oReceipt[i])
+            if (!receiptModal.ReceiptParameters[oReceipt[i]]) {
+                Alert.alert("Fields marked with (*) are mandatory");
+                return;
+                break;
+            }
 
         }
-        else {
-            postData();
+
+        console.log("Next");
+
+        var oReceiptDetail = ["UNIT_COST",
+            "EXCH_ID",
+            "EXCH_RATE"];
+        for (i = 0; i < oReceiptDetail.length; i++) {
+            console.log(oReceiptDetail[i])
+            if (!receiptModal.ReceiptDetailParameters[oReceiptDetail[i]]) {
+                Alert.alert("Fields marked with (*) are mandatory");
+                return;
+                break;
+            }
+
         }
+        postData();
+
     }
 
+    const removeDoc = (index) => {
+        var oldReceipt = { ...receiptModal };
+        oldReceipt.ReceiptParameters.UploadDocs.splice(index, 1);
+        setreceiptModal({ ...oldReceipt })
+    }
 
     const postData = () => {
         setloading(true);
         var domain = getDomain();
-        // var user = getUser();
-        // var domain = 'https://demo.vellas.net:94/arrowdemoapi_dev/api/Values';
-        var send = {
-
-            "InvoiceParameters": {
-                "UID": "",
-                "INV_NO": "",
-                REC_DATE: new Date().toISOString(),
-                VENDOR_ID: vendor.id,
-                REMARK: `Submitted by ${vendor.user} using ${selPayment.LOOKUP_DESC} \n ${expDesc}`,
-                "OPCO": 3,
-                "EXCH_ID": selCurr.Rates.ID,
-                "EXCH_RATE": selCurr.Rates.RATE,
-                STATUS: '0',
-                UPDATE_BY: vendor.user,
-                INVOICE_DOC: invoice_doc ? invoice_doc : ''
-            },
-            "InvoiceDetailParameters":
-            {
-                "UID": "",
-                "UNIT_COST": parseFloat(amount),
-            }
-
-        };
-        console.log(send);
-
-
+        console.log("receiptModal", JSON.stringify(receiptModal));
         var myHeaders = new Headers();
         myHeaders.append('Accept', 'application/json');
         myHeaders.append("Content-Type", "application/json");
         var requestOptions = {
             method: 'POST',
             headers: myHeaders,
-            body: JSON.stringify(send)
+            body: JSON.stringify(receiptModal)
         };
         fetch(
-            `${domain}/PostInvoice`,
+            `${domain}/PostReceipt`,
             requestOptions,
         )
             .then(response => response.text())
@@ -242,105 +500,201 @@ const Home = ({ navigation }) => {
         <View style={{ flex: 1, backgroundColor: '#FFF', }}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
             <Loader visible={loading} />
-            <View style={{ flexDirection: 'row', padding: 10, justifyContent: 'space-between', paddingHorizontal: 20, alignItems: 'center' }}>
-                <Text style={{ fontSize: width / 15, color: '#012f6c' }}>Upload Receipt</Text>
-                <TouchableOpacity style={{ flexDirection: 'row' }} onPress={onLogOut}>
-                    <Text style={{ fontSize: width / 25, color: '#012f6c', marginRight: 5 }}>Log Out</Text>
-
-                    <Icons name="arrow-right-thin-circle-outline" size={width / 25} color={'#012f6c'} />
-
-                </TouchableOpacity>
-            </View>
 
 
-            <ScrollView contentContainerStyle={{ flex: 1 }}>
+
+            <KeyboardAwareScrollView>
                 <View style={{ backgroundColor: 'white', padding: 20, flex: 1 }}>
-                    <Text style={{ color: 'black', fontSize: width / 18, marginBottom: 20 }}>Vendor: {vendor.name}</Text>
 
-                    <View style={{ flexDirection: 'row' }}>
-                        <View style={{ justifyContent: 'center', padding: 10, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 5, marginRight: 10 }}>
-                            <Icons name="bookmark-outline" size={30} color={'#012f6c'} />
-                        </View>
-                        <TextInput value={expDesc} onChangeText={text => setexpDesc(text)} placeholder='Enter a description' placeholderTextColor={'rgba(0,0,0,0.4)'} textAlignVertical='top' style={{ color: 'black', borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.2)', fontSize: width / 20, flex: 1, }} />
-                    </View>
-                    <View style={{ flexDirection: 'row', marginTop: 20 }}>
+                    {vendor.ID !== 0 && <Text style={{ color: 'black', fontSize: width / 18, marginBottom: 20 }}>Vendor: {vendor.NAME}</Text>}
 
-
-                        <TouchableOpacity onPress={() => { setmodalVisibleCurrency(true); }} style={{ justifyContent: 'center', padding: 10, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 5, marginRight: 10 }}>
-                            <Text style={{ color: '#012f6c', fontSize: width / 20, fontWeight: 'bold' }}>{selCurr.LOOKUP_CODE}</Text>
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={{ color: "#012f6c" }}>Enter Date*</Text>
+                        <TouchableOpacity onPress={() => setOpen(true)} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5 }}>
+                            <Text style={{ color: receiptModal.ReceiptParameters.REC_DATE ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25 }}>{receiptModal.ReceiptParameters.REC_DATE ? receiptModal.ReceiptParameters.REC_DATE : "DD/MM/YYYY"}</Text>
                         </TouchableOpacity>
-                        <TextInput keyboardType='decimal-pad' value={amount} onChangeText={text => setamount(text)} placeholder='Amount' placeholderTextColor={'rgba(0,0,0,0.4)'} textAlignVertical='top' style={{ color: 'black', borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.2)', fontSize: width / 20, flex: 1, }} />
+                        <DatePicker
+                            modal
+                            open={open}
+                            date={date}
+                            mode="date"
+                            onConfirm={(date) => {
+                                setDate(date)
+                                setOpen(false)
+                                setreceiptModal((prevModal) => ({
+                                    ...prevModal,
+                                    ReceiptParameters: {
+                                        ...prevModal.ReceiptParameters,
+                                        REC_DATE: date.toLocaleDateString('en-GB', {
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit',
+                                        }).split('/').reverse().join('-')
+                                    },
+                                }));
+                            }}
+                            onCancel={() => {
+                                setOpen(false)
+                            }}
+                        />
                     </View>
-                    <View style={{ marginTop: 20, justifyContent: 'center', flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={{ color: 'black', fontSize: width / 18, marginRight: 20 }}>Paid by:</Text>
-                        <TouchableOpacity onPress={() => { setmodalVisiblePayment(true); }} style={{ justifyContent: 'center', padding: 10, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 5, marginRight: 10 }}>
-                            <Text style={{ color: '#012f6c', fontSize: width / 20, fontWeight: 'bold' }}>{selPayment.LOOKUP_DESC}</Text>
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={{ color: "#012f6c" }}>Enter Receipt Number*</Text>
+                        <TextInput value={receiptModal.ReceiptParameters.INVOICE_DOC} onChangeText={text => setreceiptModal((prevModal) => ({
+                            ...prevModal,
+                            ReceiptParameters: {
+                                ...prevModal.ReceiptParameters,
+                                INVOICE_DOC: text
+                            }
+                        }))} placeholder='Enter receipt number' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
+                    </View>
+
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={{ color: "#012f6c" }}>Select Payment Mode*</Text>
+                        <TouchableOpacity onPress={() => setmodalVisiblePayment(true)} style={{
+                            backgroundColor: "rgb(255,255,255)", marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                            <Text style={{ color: receiptModal.ReceiptParameters.PAY_MODE_TEXT ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25, flex: 1 }}>{receiptModal.ReceiptParameters.PAY_MODE_TEXT ? receiptModal.ReceiptParameters.PAY_MODE_TEXT : "Select"}</Text>
+                            <IconsFont name="chevron-down" size={width / 20} color={'#012f6c'} />
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity onPress={submit} style={{ backgroundColor: '#012f6c', padding: 10, marginVertical: 20, borderRadius: 5 }}>
-                        <Text style={{ color: 'white', textAlign: 'center', fontSize: width / 18 }}>Submit</Text>
-                    </TouchableOpacity>
-                    {invoice_doc && <View style={styleSheet.attachment}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 10 }}>
-                            <Text style={{ color: '#012f6c', fontSize: width / 20 }}>Expense invoice</Text>
-                            <TouchableOpacity
-                                onPress={() => setinvoice_doc(null)}
-                            >
-                                <Icons
-                                    style={{ color: '#012f6c', marginLeft: 10 }}
-                                    name="close"
-                                    size={30}
-                                />
+                    <View style={{ backgroundColor: '#eaf4ff', padding: 10, borderRadius: 6 }}>
+                        <View style={{ flexDirection: 'column' }}>
+                            <Text style={{ color: "#012f6c" }}>Currency*</Text>
+                            <TouchableOpacity onPress={() => setmodalVisibleCurrency(true)} style={{
+                                backgroundColor: "rgb(255,255,255)", marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+                            }}>
+                                <Text style={{ color: receiptModal.ReceiptParameters.EXCH_ID_TEXT ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25, flex: 1 }}>{receiptModal.ReceiptParameters.EXCH_ID_TEXT ? receiptModal.ReceiptParameters.EXCH_ID_TEXT : "Select"}</Text>
+                                <IconsFont name="chevron-down" size={width / 20} color={'#012f6c'} />
                             </TouchableOpacity>
                         </View>
-                        <View
-                            style={{
-                                height: 100,
-                                width: '100%',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                alignItems: 'center'
-                            }}>
-                            <Image
-
-                                resizeMode="cover"
-                                source={{ uri: invoice_doc }}
-                                style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    width: '90%',
-                                    height: '90%',
-                                }}
-                            />
+                        <View style={{ flexDirection: 'column' }}>
+                            <Text style={{ color: "#012f6c" }}>Amount*</Text>
+                            <TextInput value={receiptModal.ReceiptParameters.EXCH_COST} onChangeText={text => {
+                                var cost = 0;
+                                var rate = 0;
+                                if (receiptModal.ReceiptDetailParameters.EXCH_RATE) {
+                                    rate = parseFloat(receiptModal.ReceiptDetailParameters.EXCH_RATE);
+                                }
+                                if (text) {
+                                    cost = text;
+                                }
+                                console.log("amount:", cost)
+                                var convertAmount = cost * rate;
+                                console.log("conv amount:", convertAmount);
+                                var oldReceipt = { ...receiptModal };
+                                oldReceipt.ReceiptParameters.EXCH_COST = text;
+                                oldReceipt.ReceiptDetailParameters.UNIT_COST = convertAmount;
+                                setreceiptModal({ ...oldReceipt });
+                            }} placeholder='Enter amount' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ backgroundColor: "rgb(255,255,255)", marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
                         </View>
 
+                        <View style={{ flexDirection: 'column' }}>
+                            <Text style={{ color: "#012f6c" }}>Currency (Claim)</Text>
+                            <TouchableOpacity onPress={() => setmodalVisibleCurrencyClaim(true)} style={{
+                                backgroundColor: "rgb(255,255,255)", marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+                            }}>
+                                <Text style={{ color: receiptModal.ReceiptDetailParameters.EXCH_ID_TEXT ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25, flex: 1 }}>{receiptModal.ReceiptDetailParameters.EXCH_ID_TEXT ? receiptModal.ReceiptDetailParameters.EXCH_ID_TEXT : "Select"}</Text>
+                                <IconsFont name="chevron-down" size={width / 20} color={'#012f6c'} />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+                            <Text style={{ color: "#012f6c" }}>Exchange Rate*</Text>
+                            <TextInput value={receiptModal.ReceiptDetailParameters.EXCH_RATE} onChangeText={text => {
+
+                                var cost = 0;
+                                var rate = 0;
+                                if (receiptModal.ReceiptParameters.EXCH_COST) {
+                                    cost = parseFloat(receiptModal.ReceiptParameters.EXCH_COST);
+                                }
+                                if (text) {
+                                    rate = text;
+                                }
+                                console.log("amount:", cost)
+                                var convertAmount = cost * rate;
+                                console.log("conv amount:", convertAmount);
+                                var oldReceipt = { ...receiptModal };
+                                oldReceipt.ReceiptDetailParameters.EXCH_RATE = text;
+                                oldReceipt.ReceiptDetailParameters.UNIT_COST = convertAmount;
+                                console.log(oldReceipt)
+                                setreceiptModal({ ...oldReceipt });
+                            }} placeholder='Enter rate' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, backgroundColor: "rgb(255,255,255)", borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, textAlign: 'center', color: "black" }} />
+                        </View>
+                        <View style={{ flexDirection: 'column' }}>
+                            <Text style={{ color: "#012f6c" }}>Amount</Text>
+                            <Text style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, backgroundColor: "white", color: receiptModal.ReceiptDetailParameters.UNIT_COST ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25, flex: 1 }}>{receiptModal.ReceiptDetailParameters.UNIT_COST ? receiptModal.ReceiptDetailParameters.UNIT_COST : "Enter amount"}</Text>
+                        </View>
+                    </View>
+                    <View style={{ flexDirection: 'column', marginTop: 20 }}>
+                        <Text style={{ color: "#012f6c" }}>Enter Description</Text>
+                        <TextInput multiline numberOfLines={4} textAlignVertical='top' value={receiptModal.ReceiptDetailParameters.DESCRIPTION} onChangeText={text => setreceiptModal((prevModal) => ({
+                            ...prevModal,
+                            ReceiptDetailParameters: {
+                                ...prevModal.ReceiptDetailParameters,
+                                DESCRIPTION: text
+                            }
+                        }))} placeholder='Enter description' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
+                    </View>
+
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={{ color: "#012f6c" }}>Enter Remark</Text>
+                        <TextInput multiline numberOfLines={2} textAlignVertical='top' value={receiptModal.ReceiptParameters.REMARK} onChangeText={text => setreceiptModal((prevModal) => ({
+                            ...prevModal,
+                            ReceiptParameters: {
+                                ...prevModal.ReceiptParameters,
+                                REMARK: text
+                            }
+                        }))} placeholder='Enter remark' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
+                    </View>
+                    <Text style={{ color: "#012f6c" }}>Upload Documents (UpTo 5)</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20 }}>
+                        <TouchableOpacity disabled={receiptModal.ReceiptParameters.UploadDocs.length < 5 ? false : true} onPress={() => getImage(true)} style={{ flex: 1, alignItems: 'center', borderColor: '#012f6c', borderWidth: 1, borderRadius: 5, paddingVertical: 10, marginRight: 20 }}>
+                            <Icons name="camera-outline" size={30} color={'#012f6c'} style={{ marginRight: 10 }} />
+                        </TouchableOpacity>
+                        <TouchableOpacity disabled={receiptModal.ReceiptParameters.UploadDocs.length < 5 ? false : true} onPress={() => getImage(false)} style={{ flex: 1, alignItems: 'center', borderColor: '#012f6c', borderWidth: 1, borderRadius: 5, paddingVertical: 10 }}>
+                            <Icons name="image-outline" size={30} color={'#012f6c'} />
+                        </TouchableOpacity>
+
+                    </View>
+                    {receiptModal.ReceiptParameters.UploadDocs.map((val, index) => {
+                        return <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20 }}>
+                            <TouchableOpacity onPress={() => saveFile(val.b64, val.filename)} style={{ flex: 1, paddingRight: 20, flexWrap: "wrap", flexShrink: 1, flexDirection: 'row' }}>
+                                <Text style={{ flex: 1, textDecorationLine: "underline", flexShrink: 1, color: "black" }}>{val.filename.toUpperCase()}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => removeDoc(index)}>
+                                <IconsFontM name="delete-outline" size={width / 15} color={'red'} />
+                            </TouchableOpacity>
+                        </View>
+                    })}
+                    <TouchableOpacity onPress={submit} style={{ backgroundColor: '#012f6c', padding: 10, marginTop: 20, marginBottom: 10, borderRadius: 5 }}>
+                        <Text style={{ color: 'white', textAlign: 'center', fontSize: width / 18 }}>Submit</Text>
+                    </TouchableOpacity>
+                    {receipt && <View style={{ flexDirection: 'row', justifyContent: "center", alignItems: "center", paddingHorizontal: 10, }}>
+                        <TouchableOpacity onPress={() => setRemove(true)}>
+                            {/* <Icons name="delete" size={width / 15} color={'red'} /> */}
+                            <Text style={{ color: 'red' }}>Delete Receipt</Text>
+                        </TouchableOpacity>
                     </View>}
-
                 </View>
 
-            </ScrollView>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, paddingHorizontal: 20, borderColor: 'rgba(0,0,0,0.2)', paddingVertical: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Image
-                        source={require('../assets/aero_icon.png')}
-                        resizeMode="contain"
-                        style={{ maxHeight: 30, width: 50, marginRight: 10 }}
-                    />
-                    <TouchableOpacity>
-                        <Text style={{ color: '#012f6c', fontWeight: 'bold' }}>Simplify Aero</Text>
-                    </TouchableOpacity>
+            </KeyboardAwareScrollView>
+            <Modal transparent={true} visible={Remove} style={{ position: 'absolute', width: '100%' }}>
+                <View style={{ backgroundColor: 'rgba(0,0,0,0.5)', flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={{ backgroundColor: 'white', padding: 20, margin: 20, borderRadius: 8, alignItems: 'center' }}>
+                        <Text style={{ color: 'black', fontWeight: 'bold', fontSize: width / 30 }}>Are you sure you want to delete this record ?</Text>
+                        <View style={{ flexDirection: 'row', marginTop: 20 }}>
+                            <TouchableOpacity onPress={onRemove} style={[styleSheet.button, { backgroundColor: 'white', }]}>
+                                <Text style={[styleSheet.buttonText, { color: 'black', paddingHorizontal: 10 }]}>Yes</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setRemove(false)} style={[styleSheet.button, { marginLeft: 20 }]}>
+                                <Text style={[styleSheet.buttonText, { paddingHorizontal: 10 }]}>No</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity onPress={() => getImage(false)}>
-                        <Icons name="camera-outline" size={30} color={'#012f6c'} style={{ marginRight: 10 }} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => getImage(true)}>
-                        <Icons name="image-outline" size={30} color={'#012f6c'} />
-                    </TouchableOpacity>
-
-                </View>
-            </View>
+            </Modal>
             <Modal animationType="fade" transparent={true} visible={modalVisibleCurrency}>
                 <TouchableOpacity
                     style={{
@@ -352,14 +706,14 @@ const Home = ({ navigation }) => {
                         padding: 10,
                     }}
                     onPress={() => setmodalVisibleCurrency(false)}>
-                    <Text style={{ color: 'white', fontSize: width / 15 }}>Close</Text>
+                    <Text style={{ color: '#012f6c', fontSize: width / 15 }}>Close</Text>
                 </TouchableOpacity>
                 <View
                     style={{
                         flex: 1,
                         justifyContent: 'center',
                         alignItems: 'center',
-                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        backgroundColor: 'white',
                         paddingTop: 80,
                     }}>
                     <ScrollView>
@@ -369,8 +723,15 @@ const Home = ({ navigation }) => {
                                     key={index}
                                     onPress={() => {
                                         setmodalVisibleCurrency(false);
-                                        setselCurr(val);
-                                        console.log(val)
+                                        setreceiptModal((prevModal) => ({
+                                            ...prevModal,
+                                            ReceiptParameters: {
+                                                ...prevModal.ReceiptParameters,
+                                                EXCH_ID: val.ID,
+                                                EXCH_ID_TEXT: val.LOOKUP_DESC,
+                                                EXCH_RATE: val.Rates.RATE
+                                            },
+                                        }));
                                     }}
                                     style={{
                                         // backgroundColor: 'white',
@@ -378,7 +739,74 @@ const Home = ({ navigation }) => {
                                         padding: 20,
                                         borderBottomWidth: 2,
                                     }}>
-                                    <Text style={{ color: 'white', fontSize: width / 15, textAlign: 'center' }}>
+                                    <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'center' }}>
+                                        {val.LOOKUP_DESC}
+                                    </Text>
+                                </TouchableOpacity>
+                            })
+                        }
+
+                    </ScrollView>
+                </View>
+            </Modal >
+            <Modal animationType="fade" transparent={true} visible={modalVisibleCurrencyClaim}>
+                <TouchableOpacity
+                    style={{
+                        top: 20,
+                        right: 20,
+                        position: 'absolute',
+                        // backgroundColor: 'white',
+                        zIndex: 99,
+                        padding: 10,
+                    }}
+                    onPress={() => setmodalVisibleCurrencyClaim(false)}>
+                    <Text style={{ color: '#012f6c', fontSize: width / 15 }}>Close</Text>
+                </TouchableOpacity>
+                <View
+                    style={{
+                        flex: 1,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'white',
+                        paddingTop: 80,
+                    }}>
+                    <ScrollView>
+                        {
+                            currency.map((val, index) => {
+                                return <TouchableOpacity
+                                    key={index}
+                                    onPress={() => {
+                                        setmodalVisibleCurrencyClaim(false);
+                                        console.log(val);
+                                        var cost = 0;
+                                        var rate = 0;
+                                        if (receiptModal.ReceiptParameters.EXCH_COST) {
+                                            cost = parseFloat(receiptModal.ReceiptParameters.EXCH_COST);
+                                        }
+                                        if (val.Rates.RATE) {
+                                            rate = parseFloat(val.Rates.RATE);
+                                        }
+                                        console.log("amount:", cost)
+                                        var convertAmount = cost * rate;
+                                        console.log("conv amount:", convertAmount);
+                                        setreceiptModal((prevModal) => ({
+                                            ...prevModal,
+                                            ReceiptDetailParameters: {
+                                                ...prevModal.ReceiptDetailParameters,
+                                                EXCH_ID: val.ID,
+                                                EXCH_ID_TEXT: val.LOOKUP_DESC,
+                                                EXCH_RATE: val.Rates.RATE,
+                                                UNIT_COST: convertAmount
+                                            },
+                                        }));
+                                    }}
+                                    style={{
+                                        // backgroundColor: 'white',
+                                        width: width * 0.9,
+                                        padding: 20,
+                                        borderBottomWidth: 2,
+                                    }}>
+                                    <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'center' }}>
                                         {val.LOOKUP_DESC}
                                     </Text>
                                 </TouchableOpacity>
@@ -400,14 +828,14 @@ const Home = ({ navigation }) => {
                         padding: 10,
                     }}
                     onPress={() => setmodalVisiblePayment(false)}>
-                    <Text style={{ color: 'white', fontSize: width / 15 }}>Close</Text>
+                    <Text style={{ color: '#012f6c', fontSize: width / 15 }}>Close</Text>
                 </TouchableOpacity>
                 <View
                     style={{
                         flex: 1,
                         justifyContent: 'center',
                         alignItems: 'center',
-                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        backgroundColor: 'white',
                         paddingTop: 80,
                     }}>
                     <ScrollView>
@@ -417,8 +845,14 @@ const Home = ({ navigation }) => {
                                     key={index}
                                     onPress={() => {
                                         setmodalVisiblePayment(false);
-                                        setselPayment(val);
-                                        console.log(val)
+                                        setreceiptModal((prevModal) => ({
+                                            ...prevModal,
+                                            ReceiptParameters: {
+                                                ...prevModal.ReceiptParameters,
+                                                PAY_MODE: val.ID,
+                                                PAY_MODE_TEXT: val.LOOKUP_DESC
+                                            },
+                                        }));
                                     }}
                                     style={{
                                         // backgroundColor: 'white',
@@ -426,7 +860,7 @@ const Home = ({ navigation }) => {
                                         padding: 20,
                                         borderBottomWidth: 2,
                                     }}>
-                                    <Text style={{ color: 'white', fontSize: width / 15, textAlign: 'center' }}>
+                                    <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'center' }}>
                                         {val.LOOKUP_DESC}
                                     </Text>
                                 </TouchableOpacity>
@@ -472,7 +906,10 @@ const Home = ({ navigation }) => {
                                 style={{
 
                                 }}
-                                onPress={() => setmodalVisibleSuccess(false)}>
+                                onPress={() => {
+                                    setmodalVisibleSuccess(false);
+                                    navigation.replace("Receipts")
+                                }}>
                                 <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'right' }}>X</Text>
                             </TouchableOpacity>
                         </View>
@@ -507,6 +944,16 @@ const styleSheet = StyleSheet.create({
             },
         }),
     },
+    button: {
+        backgroundColor: '#01315C',
+        borderRadius: 8,
+        padding: 10,
+    },
+
+    buttonText: {
+        color: 'white',
+        textAlign: 'center',
+    }
 })
 
 export default Home

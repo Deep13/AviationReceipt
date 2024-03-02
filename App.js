@@ -15,6 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import auth from '@react-native-firebase/auth';
 import Home from './components/Home';
+import Receipts from './components/Receipts';
+import ReceiptDetail from './components/ReceiptDetail';
 import Login from './components/Login';
 import ClientLogin from './components/ClientLogin';
 const Stack = createNativeStackNavigator();
@@ -62,7 +64,10 @@ export default function App() {
   const LoggedInContainer = ({ navigation }) => {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Receipts" component={Receipts} />
         <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="ReceiptDetail" component={ReceiptDetail} />
+
       </Stack.Navigator>
     );
   };

@@ -11,14 +11,15 @@ import {
 } from 'react-native';
 import React, { useRef, useEffect, useState } from 'react';
 import firestore from '@react-native-firebase/firestore';
-
+import AwesomeAlert from 'react-native-awesome-alerts';
 import auth from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setUser, setDomain } from './functions/helper';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
 
 const Login = ({ navigation }) => {
     const [loading, setloading] = useState(false);
-    const [initializing, setInitializing] = useState(true);
+    const [showLogOut, setshowLogOut] = useState(false);
     const [logUser, setlogUser] = useState();
     const domain = useRef(null);
     const [email, setemail] = useState('');
@@ -67,13 +68,12 @@ const Login = ({ navigation }) => {
             fetch(url)
                 .then(res => res.json())
                 .then(data => {
-                    console.log(data);
-                    if (data.length > 0 && data[0].ACCESS_RIGHT !== null && data[0].CID !== null) {
+                    console.log("userLogin", data);
+                    if (data.length > 0) {
                         setloading(false);
-
                         AsyncStorage.setItem('username', username);
                         AsyncStorage.setItem('password', password);
-                        setUser({ ...data[0], user: email });
+                        setUser({ ...data[0], user: username });
                         navigation.reset({
                             index: 0,
                             routes: [{ name: 'LoggedInContainer' }],
@@ -109,7 +109,8 @@ const Login = ({ navigation }) => {
             fetch(url)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.length > 0 && data[0].ACCESS_RIGHT !== null && data[0].CID !== null) {
+                    console.log("userLoginn", data)
+                    if (data.length > 0) {
                         setloading(false);
                         console.log(data[0]);
                         AsyncStorage.setItem('username', email);
@@ -133,10 +134,12 @@ const Login = ({ navigation }) => {
                 })
         }
     };
+
     const validateEmail = () => {
         var re = /\S+@\S+\.\S+/;
         return re.test(email);
     };
+
     const onLogOut = () => {
         auth().signOut();
         navigation.reset({
@@ -150,145 +153,174 @@ const Login = ({ navigation }) => {
             style={{
                 flexDirection: 'column',
                 justifyContent: 'center',
-                paddingTop: 30,
                 backgroundColor: '#FFF',
                 flex: 1
             }}>
             <StatusBar barStyle="light-content" backgroundColor="#FFF" />
-
-            <Image
-                source={require('../assets/aero_icon.png')}
-                resizeMode="contain"
-                style={{ maxHeight: 100, width: '100%' }}
-            />
-
-            <View style={{ marginTop: 20, backgroundColor: 'white', marginHorizontal: 20, borderWidth: 1, borderRadius: 20, marginBottom: 10, paddingBottom: 20 }}>
-                <Text
-                    style={{
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        fontSize: 20,
-                        color: 'white',
-                        backgroundColor: '#012f6c',
-                        paddingTop: 5,
-                        paddingBottom: 5,
-                        borderTopLeftRadius: 20, borderTopRightRadius: 20
-                    }}>
-                    User Sign In
-                </Text>
-                {err && (
-                    <View
-                        style={{
-                            width: '100%',
-                            height: 50,
-                            paddingHorizontal: 10,
-                            justifyContent: 'center',
-                            backgroundColor: '#d3d3d360',
-                        }}>
-                        <Text style={{ color: 'red', fontSize: 14 }}>&bull; {errmsg}</Text>
-                    </View>
-                )}
-                <View style={{ marginTop: 5, padding: 10 }}>
+            <KeyboardAwareScrollView>
+                <Image
+                    source={require('../assets/aero_icon.png')}
+                    resizeMode="contain"
+                    style={{ maxHeight: 100, width: '100%' }}
+                />
+                <View style={{ marginTop: 20, backgroundColor: 'white', marginHorizontal: 20, borderWidth: 1, borderRadius: 20, marginBottom: 10, paddingBottom: 20 }}>
                     <Text
                         style={{
-                            color: '#000',
                             fontWeight: 'bold',
-                            fontSize: 16,
+                            textAlign: 'center',
+                            fontSize: 20,
+                            color: 'white',
+                            backgroundColor: '#012f6c',
                             paddingTop: 5,
-                            paddingBottom: 10,
+                            paddingBottom: 5,
+                            borderTopLeftRadius: 20, borderTopRightRadius: 20
                         }}>
-                        Welcome {logUser},
+                        User Sign In
                     </Text>
-                    <Text style={{ color: '#000', fontSize: 18 }}>Username</Text>
-                    {emailinvalid && (
-                        <Text style={{ color: 'red', fontSize: 12, marginTop: 10 }}>
-                            {email.length === 0
-                                ? 'Username Required'
-                                : 'Invalid Username'}
-                        </Text>
-                    )}
-                    <TextInput
-
-                        onChangeText={text => setemail(text)}
-                        onFocus={() => {
-                            setemailinvalid(false);
-                        }}
-                        onBlur={() => {
-                            if (email.length === 0) setemailinvalid(true);
-                        }}
-                        style={{
-                            width: '100%',
-                            height: 50,
-                            paddingLeft: 10,
-                            backgroundColor: '#fff',
-                            borderWidth: 1,
-                            borderColor: '#d3d3d3',
-                            marginTop: 10,
-                            color: '#000',
-                            borderRadius: 6
-                        }}
-                    />
-
-                    <Text style={{ color: '#000', fontSize: 18, marginTop: 20 }}>
-                        Password
-                    </Text>
-                    <TextInput
-                        textContentType="password"
-                        secureTextEntry={true}
-                        onFocus={() => seterr(false)}
-                        onChangeText={text => setpword(text)}
-                        style={{
-                            width: '100%',
-                            height: 50,
-                            backgroundColor: '#fff',
-                            borderWidth: 1,
-                            borderColor: '#d3d3d3',
-                            marginTop: 10,
-                            color: '#000',
-                            borderRadius: 6
-
-                        }}
-                    />
-
-                    {loading ? (
-                        <TouchableOpacity
+                    {err && (
+                        <View
                             style={{
                                 width: '100%',
-                                height: 40,
-                                marginTop: 30,
-                                backgroundColor: '#012f6c',
+                                height: 50,
+                                paddingHorizontal: 10,
                                 justifyContent: 'center',
-                                borderRadius: 6,
-                                alignItems: 'center',
+                                backgroundColor: '#d3d3d360',
                             }}>
-                            <ActivityIndicator />
-                        </TouchableOpacity>
-                    ) : (
-                        <>
+                            <Text style={{ color: 'red', fontSize: 14 }}>&bull; {errmsg}</Text>
+                        </View>
+                    )}
+                    <View style={{ marginTop: 5, padding: 10 }}>
+                        <Text
+                            style={{
+                                color: '#000',
+                                fontWeight: 'bold',
+                                fontSize: 16,
+                                paddingTop: 5,
+                                paddingBottom: 10,
+                            }}>
+                            Welcome {logUser},
+                        </Text>
+                        <Text style={{ color: '#000', fontSize: 18 }}>Username</Text>
+                        {emailinvalid && (
+                            <Text style={{ color: 'red', fontSize: 12, marginTop: 10 }}>
+                                {email.length === 0
+                                    ? 'Username Required'
+                                    : 'Invalid Username'}
+                            </Text>
+                        )}
+                        <TextInput
+
+                            onChangeText={text => setemail(text)}
+                            onFocus={() => {
+                                setemailinvalid(false);
+                            }}
+                            onBlur={() => {
+                                if (email.length === 0) setemailinvalid(true);
+                            }}
+                            style={{
+                                width: '100%',
+                                height: 50,
+                                paddingLeft: 10,
+                                backgroundColor: '#fff',
+                                borderWidth: 1,
+                                borderColor: '#d3d3d3',
+                                marginTop: 10,
+                                color: '#000',
+                                borderRadius: 6
+                            }}
+                        />
+
+                        <Text style={{ color: '#000', fontSize: 18, marginTop: 20 }}>
+                            Password
+                        </Text>
+                        <TextInput
+                            textContentType="password"
+                            secureTextEntry={true}
+                            onFocus={() => seterr(false)}
+                            onChangeText={text => setpword(text)}
+                            style={{
+                                width: '100%',
+                                height: 50,
+                                backgroundColor: '#fff',
+                                borderWidth: 1,
+                                borderColor: '#d3d3d3',
+                                marginTop: 10,
+                                color: '#000',
+                                borderRadius: 6
+
+                            }}
+                        />
+
+                        {loading ? (
                             <TouchableOpacity
-                                onPress={loginStart}
                                 style={{
                                     width: '100%',
                                     height: 40,
                                     marginTop: 30,
                                     backgroundColor: '#012f6c',
                                     justifyContent: 'center',
+                                    borderRadius: 6,
                                     alignItems: 'center',
-                                    borderRadius: 6
                                 }}>
-                                <Text style={{ fontSize: 18, color: 'white' }}>Login</Text>
+                                <ActivityIndicator />
                             </TouchableOpacity>
-                            <TouchableOpacity>
-                                <Text
-                                    style={{ textAlign: 'center', color: '#000', marginTop: 20 }}
-                                    onPress={onLogOut}>
-                                    Log out Client
-                                </Text>
-                            </TouchableOpacity></>
-                    )}
+                        ) : (
+                            <>
+                                <TouchableOpacity
+                                    onPress={loginStart}
+                                    style={{
+                                        width: '100%',
+                                        height: 40,
+                                        marginTop: 30,
+                                        backgroundColor: '#012f6c',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        borderRadius: 6
+                                    }}>
+                                    <Text style={{ fontSize: 18, color: 'white' }}>Login</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity>
+                                    <Text
+                                        style={{ textAlign: 'center', color: '#000', marginTop: 20 }}
+                                        onPress={() => setshowLogOut(true)}>
+                                        Log out Client
+                                    </Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
                 </View>
-            </View>
+                <AwesomeAlert
+                    show={showLogOut}
+                    showProgress={false}
+                    title="Logging Out"
+                    message="Do you want to log out client?"
+                    closeOnTouchOutside={false}
+                    closeOnHardwareBackPress={false}
+                    showCancelButton={true}
+                    showConfirmButton={true}
+                    cancelText="No"
+                    confirmText="Yes"
+                    confirmButtonColor="#01315C"
+                    cancelButtonTextStyle={{ color: 'black', fontSize: 15 }}
+                    confirmButtonTextStyle={{ fontSize: 20 }}
+                    confirmButtonStyle={{ marginLeft: 30 }}
+                    titleStyle={{ color: 'black' }}
+                    messageStyle={{ color: 'black' }}
+                    onCancelPressed={() => {
+                        // this.hideAlert();
+                        setshowLogOut(false);
 
+                    }}
+                    onConfirmPressed={() => {
+                        // this.hideAlert();
+                        setshowLogOut(false);
+                        onLogOut();
+
+
+                    }}
+                />
+            </KeyboardAwareScrollView>
         </View>
 
     )
