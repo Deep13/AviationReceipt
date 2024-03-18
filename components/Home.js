@@ -16,8 +16,12 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 const Home = ({ navigation, route }) => {
     const vendor = getUser();
     const { receipt } = route.params;
+    console.log("receipt", receipt)
     const [loading, setloading] = useState(false);
+    const [fullCurrency, setfullCurrency] = useState([]);
+    const [fullPaymentMode, setfullPaymentMode] = useState([]);
     const [modalVisibleCurrency, setmodalVisibleCurrency] = useState(false);
+    const [statusModal, setstatusModal] = useState(false);
     const [modalVisibleCurrencyClaim, setmodalVisibleCurrencyClaim] = useState(false);
     const [modalVisibleSuccess, setmodalVisibleSuccess] = useState(false);
     const [modalVisiblePayment, setmodalVisiblePayment] = useState(false);
@@ -25,6 +29,9 @@ const Home = ({ navigation, route }) => {
     const [date, setDate] = useState(new Date())
     const [open, setOpen] = useState(false);
     const [Remove, setRemove] = useState(false);
+    const [query, setQuery] = useState('');
+
+    const Receiptstatus = [{ key: '3', desc: "Ready" }, { key: '2', desc: "Pending" }]
     const [receiptModal, setreceiptModal] = useState({
         "ReceiptParameters": {
             "REC_DATE": "",
@@ -43,17 +50,30 @@ const Home = ({ navigation, route }) => {
             "STATUS": "0",
             "EXCH_COST": "",
             "UPDATE_BY": vendor.user,
-            "UploadDocs": []
+            "UploadDocs": [],
+            "COMPLETED": "",
+            "COMPLETED_DESC": "",
         },
         "ReceiptDetailParameters": {
             "UID": "",
             "DESCRIPTION": "",
             "UNIT_COST": "",
-            "EXCH_ID": "",
+            "EXCH_ID": "92",
             "EXCH_RATE": "",
-            "EXCH_ID_TEXT": ""
+            "EXCH_ID_TEXT": "US DOLLAR"
         }
-    })
+    });
+    const handleSearch = text => {
+        console.log('search text', text)
+        const formattedQuery = text.toLowerCase();
+        const filteredData = fullCurrency.filter(user => {
+            return user.LOOKUP_DESC.toLowerCase().includes(formattedQuery);
+        });
+        console.log('filtered', filteredData)
+
+        setcurrency(filteredData);
+        setQuery(text);
+    };
     const [payment, setpayment] = useState([]);
     const onRemove = () => {
         if (receipt && receipt.COMPLETED != 0) {
@@ -265,7 +285,7 @@ const Home = ({ navigation, route }) => {
                 .then(res => res.json())
                 .then(data => {
                     // setloading(false);
-                    // console.log(data, "detail")
+                    console.log(data, "detail")
                     if (data && data.length > 0) {
                         const url2 = `${domain}/GetReceiptFiles?_token=b95909e1-d33f-469f-90c6-5a2fb1e5627c&UID=${receipt.UID}`;
                         fetch(url2)
@@ -297,12 +317,14 @@ const Home = ({ navigation, route }) => {
                                         "STATUS": "0",
                                         "UPDATE_BY": receipt.UPDATE_BY,
                                         "EXCH_COST": receipt.EXCH_COST.toString(),
+                                        "COMPLETED": receipt.COMPLETED,
+                                        "COMPLETED_DESC": receipt.COMPLETED_DESC,
                                         "UploadDocs": dataFIle.length > 0 ? dataFIle : []
                                     },
                                     "ReceiptDetailParameters": {
                                         "UID": data[0].UID,
                                         "DESCRIPTION": data[0].DESC_ENG,
-                                        "UNIT_COST": receipt.TOTAL_AMOUNT,
+                                        "UNIT_COST": data[0].UNIT_COST.toString(),
                                         "EXCH_ID": data[0].CUR_ID,
                                         "EXCH_RATE": data[0].CUR_RATE.toString(),
                                         "EXCH_ID_TEXT": data[0].CURRENCY_DESC
@@ -350,9 +372,9 @@ const Home = ({ navigation, route }) => {
                     "UID": "",
                     "DESCRIPTION": "",
                     "UNIT_COST": "",
-                    "EXCH_ID": "",
+                    "EXCH_ID": "92",
                     "EXCH_RATE": "",
-                    "EXCH_ID_TEXT": ""
+                    "EXCH_ID_TEXT": "US DOLLAR"
                 }
             })
         }
@@ -377,7 +399,9 @@ const Home = ({ navigation, route }) => {
                     // console.log(val)
                     val.TYPE == '11' ? acurency.push(val) : apayment.push(val)
                 });
-                console.log('curr', acurency)
+                console.log('curr', acurency);
+                setfullCurrency(acurency);
+                setfullPaymentMode(apayment);
                 setcurrency(acurency);
                 setpayment(apayment);
 
@@ -419,7 +443,8 @@ const Home = ({ navigation, route }) => {
         })
     }
     const submit = () => {
-        if (receipt && receipt.COMPLETED != 0) {
+        // console.log(receipt.COMPLETED)
+        if (receipt && receipt.COMPLETED == 1) {
             Alert.alert("You cannot edit this completed receipt");
             return;
         }
@@ -500,13 +525,17 @@ const Home = ({ navigation, route }) => {
         <View style={{ flex: 1, backgroundColor: '#FFF', }}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
             <Loader visible={loading} />
-
-
-
             <KeyboardAwareScrollView>
                 <View style={{ backgroundColor: 'white', padding: 20, flex: 1 }}>
 
-                    {vendor.ID !== 0 && <Text style={{ color: 'black', fontSize: width / 18, marginBottom: 20 }}>Vendor: {vendor.NAME}</Text>}
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, justifyContent: "space-between" }}>
+                        <TouchableOpacity onPress={() => {
+                            navigation.replace("Receipts")
+                        }}>
+                            <IconsFont name="chevron-left" size={width / 15} color={'#012f6c'} />
+                        </TouchableOpacity>
+                        {vendor.ID !== 0 && <Text style={{ color: 'black', fontSize: width / 18, }}>Vendor: {vendor.NAME}</Text>}
+                    </View>
 
                     <View style={{ flexDirection: 'column' }}>
                         <Text style={{ color: "#012f6c" }}>Enter Date*</Text>
@@ -571,7 +600,7 @@ const Home = ({ navigation, route }) => {
                         </View>
                         <View style={{ flexDirection: 'column' }}>
                             <Text style={{ color: "#012f6c" }}>Amount*</Text>
-                            <TextInput value={receiptModal.ReceiptParameters.EXCH_COST} onChangeText={text => {
+                            <TextInput value={receiptModal.ReceiptDetailParameters.UNIT_COST} onChangeText={text => {
                                 var cost = 0;
                                 var rate = 0;
                                 if (receiptModal.ReceiptDetailParameters.EXCH_RATE) {
@@ -584,8 +613,8 @@ const Home = ({ navigation, route }) => {
                                 var convertAmount = cost * rate;
                                 console.log("conv amount:", convertAmount);
                                 var oldReceipt = { ...receiptModal };
-                                oldReceipt.ReceiptParameters.EXCH_COST = text;
-                                oldReceipt.ReceiptDetailParameters.UNIT_COST = convertAmount;
+                                oldReceipt.ReceiptDetailParameters.UNIT_COST = text;
+                                oldReceipt.ReceiptParameters.EXCH_COST = convertAmount;
                                 setreceiptModal({ ...oldReceipt });
                             }} placeholder='Enter amount' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ backgroundColor: "rgb(255,255,255)", marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
                         </View>
@@ -605,8 +634,8 @@ const Home = ({ navigation, route }) => {
 
                                 var cost = 0;
                                 var rate = 0;
-                                if (receiptModal.ReceiptParameters.EXCH_COST) {
-                                    cost = parseFloat(receiptModal.ReceiptParameters.EXCH_COST);
+                                if (receiptModal.ReceiptDetailParameters.UNIT_COST) {
+                                    cost = parseFloat(receiptModal.ReceiptDetailParameters.UNIT_COST);
                                 }
                                 if (text) {
                                     rate = text;
@@ -616,14 +645,14 @@ const Home = ({ navigation, route }) => {
                                 console.log("conv amount:", convertAmount);
                                 var oldReceipt = { ...receiptModal };
                                 oldReceipt.ReceiptDetailParameters.EXCH_RATE = text;
-                                oldReceipt.ReceiptDetailParameters.UNIT_COST = convertAmount;
+                                oldReceipt.ReceiptParameters.EXCH_COST = convertAmount;
                                 console.log(oldReceipt)
                                 setreceiptModal({ ...oldReceipt });
                             }} placeholder='Enter rate' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, backgroundColor: "rgb(255,255,255)", borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, textAlign: 'center', color: "black" }} />
                         </View>
                         <View style={{ flexDirection: 'column' }}>
                             <Text style={{ color: "#012f6c" }}>Amount</Text>
-                            <Text style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, backgroundColor: "white", color: receiptModal.ReceiptDetailParameters.UNIT_COST ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25, flex: 1 }}>{receiptModal.ReceiptDetailParameters.UNIT_COST ? receiptModal.ReceiptDetailParameters.UNIT_COST : "Enter amount"}</Text>
+                            <Text style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, backgroundColor: "white", color: receiptModal.ReceiptParameters.EXCH_COST ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25, flex: 1 }}>{receiptModal.ReceiptParameters.EXCH_COST ? receiptModal.ReceiptParameters.EXCH_COST : "Enter amount"}</Text>
                         </View>
                     </View>
                     <View style={{ flexDirection: 'column', marginTop: 20 }}>
@@ -668,6 +697,15 @@ const Home = ({ navigation, route }) => {
                             </TouchableOpacity>
                         </View>
                     })}
+                    <View style={{ flexDirection: 'column', marginTop: 20 }}>
+                        <Text style={{ color: "#012f6c" }}>Select Completion Status</Text>
+                        <TouchableOpacity onPress={() => setstatusModal(true)} style={{
+                            backgroundColor: "rgb(255,255,255)", marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                            <Text style={{ color: receiptModal.ReceiptParameters.COMPLETED_DESC ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25, flex: 1 }}>{receiptModal.ReceiptParameters.COMPLETED_DESC ? receiptModal.ReceiptParameters.COMPLETED_DESC : "Select"}</Text>
+                            <IconsFont name="chevron-down" size={width / 20} color={'#012f6c'} />
+                        </TouchableOpacity>
+                    </View>
                     <TouchableOpacity onPress={submit} style={{ backgroundColor: '#012f6c', padding: 10, marginTop: 20, marginBottom: 10, borderRadius: 5 }}>
                         <Text style={{ color: 'white', textAlign: 'center', fontSize: width / 18 }}>Submit</Text>
                     </TouchableOpacity>
@@ -698,14 +736,14 @@ const Home = ({ navigation, route }) => {
             <Modal animationType="fade" transparent={true} visible={modalVisibleCurrency}>
                 <TouchableOpacity
                     style={{
-                        top: 20,
+                        top: 10,
                         right: 20,
                         position: 'absolute',
                         // backgroundColor: 'white',
                         zIndex: 99,
                         padding: 10,
                     }}
-                    onPress={() => setmodalVisibleCurrency(false)}>
+                    onPress={() => { setmodalVisibleCurrency(false); setcurrency(fullCurrency); setQuery("") }}>
                     <Text style={{ color: '#012f6c', fontSize: width / 15 }}>Close</Text>
                 </TouchableOpacity>
                 <View
@@ -716,6 +754,16 @@ const Home = ({ navigation, route }) => {
                         backgroundColor: 'white',
                         paddingTop: 80,
                     }}>
+                    <TextInput
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        clearButtonMode="always"
+                        value={query}
+                        onChangeText={queryText => handleSearch(queryText)}
+                        placeholder="Search"
+                        placeholderTextColor='black'
+                        style={{ backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 10, borderRadius: 5, color: 'black', width: '80%', marginHorizontal: 20 }}
+                    />
                     <ScrollView>
                         {
                             currency.map((val, index) => {
@@ -723,13 +771,23 @@ const Home = ({ navigation, route }) => {
                                     key={index}
                                     onPress={() => {
                                         setmodalVisibleCurrency(false);
+                                        var rate = 0;
+                                        if (receiptModal.ReceiptDetailParameters.EXCH_ID == "92") {
+                                            rate = val.Rates.RATE;
+                                        }
+
                                         setreceiptModal((prevModal) => ({
                                             ...prevModal,
                                             ReceiptParameters: {
                                                 ...prevModal.ReceiptParameters,
+                                                EXCH_COST: 0,
                                                 EXCH_ID: val.ID,
                                                 EXCH_ID_TEXT: val.LOOKUP_DESC,
                                                 EXCH_RATE: val.Rates.RATE
+                                            },
+                                            ReceiptDetailParameters: {
+                                                ...prevModal.ReceiptDetailParameters,
+                                                EXCH_RATE: rate,
                                             },
                                         }));
                                     }}
@@ -759,7 +817,7 @@ const Home = ({ navigation, route }) => {
                         zIndex: 99,
                         padding: 10,
                     }}
-                    onPress={() => setmodalVisibleCurrencyClaim(false)}>
+                    onPress={() => { setmodalVisibleCurrencyClaim(false); setcurrency(fullCurrency); setQuery("") }}>
                     <Text style={{ color: '#012f6c', fontSize: width / 15 }}>Close</Text>
                 </TouchableOpacity>
                 <View
@@ -770,6 +828,16 @@ const Home = ({ navigation, route }) => {
                         backgroundColor: 'white',
                         paddingTop: 80,
                     }}>
+                    <TextInput
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        clearButtonMode="always"
+                        value={query}
+                        onChangeText={queryText => handleSearch(queryText)}
+                        placeholder="Search"
+                        placeholderTextColor='black'
+                        style={{ backgroundColor: 'rgba(0,0,0,0.1)', paddingHorizontal: 10, borderRadius: 5, color: 'black', width: '80%', marginHorizontal: 20 }}
+                    />
                     <ScrollView>
                         {
                             currency.map((val, index) => {
@@ -783,8 +851,13 @@ const Home = ({ navigation, route }) => {
                                         if (receiptModal.ReceiptParameters.EXCH_COST) {
                                             cost = parseFloat(receiptModal.ReceiptParameters.EXCH_COST);
                                         }
-                                        if (val.Rates.RATE) {
-                                            rate = parseFloat(val.Rates.RATE);
+                                        if (val.ID == '92') {
+                                            console.log("US", receiptModal.ReceiptParameters.EXCH_RATE)
+                                            rate = parseFloat(receiptModal.ReceiptParameters.EXCH_RATE);
+                                        }
+                                        else {
+                                            rate = 0;
+                                            Alert.alert("Kindly provide the conversion exchange rate.")
                                         }
                                         console.log("amount:", cost)
                                         var convertAmount = cost * rate;
@@ -795,7 +868,7 @@ const Home = ({ navigation, route }) => {
                                                 ...prevModal.ReceiptDetailParameters,
                                                 EXCH_ID: val.ID,
                                                 EXCH_ID_TEXT: val.LOOKUP_DESC,
-                                                EXCH_RATE: val.Rates.RATE,
+                                                EXCH_RATE: rate.toString(),
                                                 UNIT_COST: convertAmount
                                             },
                                         }));
@@ -862,6 +935,59 @@ const Home = ({ navigation, route }) => {
                                     }}>
                                     <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'center' }}>
                                         {val.LOOKUP_DESC}
+                                    </Text>
+                                </TouchableOpacity>
+                            })
+                        }
+
+                    </ScrollView>
+                </View>
+            </Modal >
+            <Modal animationType="fade" transparent={true} visible={statusModal}>
+                <TouchableOpacity
+                    style={{
+                        top: 20,
+                        right: 20,
+                        position: 'absolute',
+                        // backgroundColor: 'white',
+                        zIndex: 99,
+                        padding: 10,
+                    }}
+                    onPress={() => setstatusModal(false)}>
+                    <Text style={{ color: '#012f6c', fontSize: width / 15 }}>Close</Text>
+                </TouchableOpacity>
+                <View
+                    style={{
+                        flex: 1,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'white',
+                        paddingTop: 80,
+                    }}>
+                    <ScrollView>
+                        {
+                            Receiptstatus.map((val, index) => {
+                                return <TouchableOpacity
+                                    key={index}
+                                    onPress={() => {
+                                        setstatusModal(false);
+                                        setreceiptModal((prevModal) => ({
+                                            ...prevModal,
+                                            ReceiptParameters: {
+                                                ...prevModal.ReceiptParameters,
+                                                COMPLETED: val.key,
+                                                COMPLETED_DESC: val.desc
+                                            },
+                                        }));
+                                    }}
+                                    style={{
+                                        // backgroundColor: 'white',
+                                        width: width * 0.9,
+                                        padding: 20,
+                                        borderBottomWidth: 2,
+                                    }}>
+                                    <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'center' }}>
+                                        {val.desc}
                                     </Text>
                                 </TouchableOpacity>
                             })

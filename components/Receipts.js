@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import auth from '@react-native-firebase/auth';
 const { width, height } = Dimensions.get('window');
 import IconsFont from 'react-native-vector-icons/FontAwesome';
+import IconsFontIonicons from 'react-native-vector-icons/Ionicons';
 
 export default function Receipts({ navigation }) {
     const vendor = getUser();
@@ -22,12 +23,12 @@ export default function Receipts({ navigation }) {
         });
     };
 
-    useEffect(() => {
+    const refresh = () => {
         setloading(true);
 
         var domain = getDomain();
         // var domain = 'https://demo.vellas.net:94/arrowdemoapi_dev/api/Values';
-        const url = `${domain}/GetListOfInvoiceByUser?_token=b95909e1-d33f-469f-90c6-5a2fb1e5627c&username=${vendor.USERNAME}`;
+        const url = `${domain}/GetListOfInvoiceByUser?_token=b95909e1-d33f-469f-90c6-5a2fb1e5627c&username=${vendor.user}`;
         console.log(url);
         fetch(url)
             .then(res => res.json())
@@ -36,7 +37,31 @@ export default function Receipts({ navigation }) {
                 console.log(data)
                 if (data && data.length > 0) {
                     // data[0].COMPLETED = 1;
-                    setreceiptList(data)
+                    setreceiptList([...data])
+                }
+
+            })
+            .catch(e => {
+                console.log(e, 'Function error');
+                setloading(false);
+            })
+    }
+
+    useEffect(() => {
+        setloading(true);
+
+        var domain = getDomain();
+        // var domain = 'https://demo.vellas.net:94/arrowdemoapi_dev/api/Values';
+        const url = `${domain}/GetListOfInvoiceByUser?_token=b95909e1-d33f-469f-90c6-5a2fb1e5627c&username=${vendor.user}`;
+        console.log(url);
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                setloading(false);
+                console.log(data)
+                if (data && data.length > 0) {
+                    // data[0].COMPLETED = 1;
+                    setreceiptList([...data])
                 }
 
             })
@@ -65,14 +90,21 @@ export default function Receipts({ navigation }) {
             </View>
             <View style={{ justifyContent: 'space-between', alignItems: "center", flexDirection: 'row', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.4)', marginHorizontal: 10 }}>
                 <Text style={{ fontSize: width / 20, color: "black" }}>Receipts</Text>
-                <TouchableOpacity onPress={() => {
-                    navigation.navigate("Home", {
-                        receipt: null
-                    })
-                }} style={{ backgroundColor: "#012f6c", marginTop: 10, padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
-                    <IconsFont name="plus" size={width / 20} color={'white'} />
-                    <Text style={{ color: "white", marginLeft: 10 }}>Add Receipt</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => {
+                        navigation.navigate("Home", {
+                            receipt: null
+                        })
+                    }} style={{ backgroundColor: "#012f6c", marginTop: 10, padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+                        <IconsFont name="plus" size={width / 20} color={'white'} />
+                        <Text style={{ color: "white", marginLeft: 10 }}>Add Receipt</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => {
+                        refresh()
+                    }} style={{ marginTop: 10, padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+                        <IconsFontIonicons name="reload" size={width / 15} color={'#012f6c'} />
+                    </TouchableOpacity>
+                </View>
             </View>
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
                 {receiptList.map((val, index) => {
@@ -81,7 +113,7 @@ export default function Receipts({ navigation }) {
                     })} key={index} style={{ backgroundColor: "#3f77c8", marginTop: 10, padding: 10, borderRadius: 8, marginHorizontal: 20 }}>
                         <Text style={{ color: "white" }}>Receipt No.: {val.INV_NO}</Text>
                         <Text style={{ color: "white" }}>{val.REC_DATE}</Text>
-                        <Text style={{ color: "white" }}>{val.CURRENCY_CODE} {val.TOTAL_AMOUNT}</Text>
+                        <Text style={{ color: "white" }}>Amount: {val.TOTAL_AMOUNT}</Text>
                     </TouchableOpacity>
                 })}
             </ScrollView>

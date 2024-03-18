@@ -58,8 +58,11 @@ const ClientLogin = ({ navigation }) => {
                 .catch(error => {
                     console.log(error);
 
-                    if (error.code === 'auth/user-not-found')
+                    if (error.code === 'auth/user-not-found') {
                         inValidator(true, 'Incorrect Credentials');
+                    }
+
+                    inValidator(true, 'Incorrect Credentials');
                     setloading(false);
                 });
         }

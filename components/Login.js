@@ -110,7 +110,7 @@ const Login = ({ navigation }) => {
                 .then(res => res.json())
                 .then(data => {
                     console.log("userLoginn", data)
-                    if (data.length > 0) {
+                    if (data.length > 0 && data[0].ID) {
                         setloading(false);
                         console.log(data[0]);
                         AsyncStorage.setItem('username', email);
