@@ -17,6 +17,8 @@ import auth from '@react-native-firebase/auth';
 import Home from './components/Home';
 import Receipts from './components/Receipts';
 import ReceiptDetail from './components/ReceiptDetail';
+import ViewReceipt from './components/ViewReceipt';
+import AllReceipt from './components/AllReceipt';
 import Login from './components/Login';
 import ClientLogin from './components/ClientLogin';
 const Stack = createNativeStackNavigator();
@@ -66,6 +68,8 @@ export default function App() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Receipts" component={Receipts} />
         <Stack.Screen name="Home" component={Home} />
+        <Stack.Screen name="AllReceipt" component={AllReceipt} />
+        <Stack.Screen name="ViewReceipt" component={ViewReceipt} />
         <Stack.Screen name="ReceiptDetail" component={ReceiptDetail} />
 
       </Stack.Navigator>

@@ -22,7 +22,24 @@ export default function Receipts({ navigation }) {
             routes: [{ name: 'SignInContainer' }],
         });
     };
+    const formatDate2 = (inputDate) => {
 
+        let day = inputDate.getDate();
+
+        let month = inputDate.getMonth() + 1;
+
+        let year = inputDate.getFullYear();
+        if (day < 10) {
+            day = '0' + day;
+        }
+
+        if (month < 10) {
+            month = `0${month}`;
+        }
+
+        let formatted = `${day}/${month}/${year}`;
+        return formatted;
+    };
     const refresh = () => {
         setloading(true);
 
@@ -34,10 +51,12 @@ export default function Receipts({ navigation }) {
             .then(res => res.json())
             .then(data => {
                 setloading(false);
-                console.log(data)
                 if (data && data.length > 0) {
                     // data[0].COMPLETED = 1;
                     setreceiptList([...data])
+                }
+                else {
+                    setreceiptList([])
                 }
 
             })
@@ -63,6 +82,9 @@ export default function Receipts({ navigation }) {
                     // data[0].COMPLETED = 1;
                     setreceiptList([...data])
                 }
+                else {
+                    setreceiptList([])
+                }
 
             })
             .catch(e => {
@@ -75,7 +97,7 @@ export default function Receipts({ navigation }) {
         <View style={{ flex: 1, backgroundColor: '#FFF', }}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
             <Loader visible={loading} />
-            <View style={{ flexDirection: 'row', padding: 10, justifyContent: 'space-between', alignItems: "flex-start", paddingHorizontal: 10, }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: "flex-start", marginVertical: 10, marginHorizontal: 10 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: "flex-start", flex: 1, marginRight: 10, flexWrap: "wrap" }}>
                     <Image
                         source={require('../assets/aero_icon.png')}
@@ -84,8 +106,8 @@ export default function Receipts({ navigation }) {
                     />
                     <Text style={{ fontSize: width / 25, color: '#012f6c' }}>{vendor.user}</Text>
                 </View>
-                <TouchableOpacity onPress={() => setonLogOut(true)}>
-                    <IconsFont name="power-off" size={width / 20} color={'red'} />
+                <TouchableOpacity onPress={() => setonLogOut(true)} style={{ marginRight: 2 }}>
+                    <IconsFont name="power-off" size={width / 15} color={'red'} />
                 </TouchableOpacity>
             </View>
             <View style={{ justifyContent: 'space-between', alignItems: "center", flexDirection: 'row', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.4)', marginHorizontal: 10 }}>
@@ -101,7 +123,7 @@ export default function Receipts({ navigation }) {
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => {
                         refresh()
-                    }} style={{ marginTop: 10, padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+                    }} style={{ marginTop: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
                         <IconsFontIonicons name="reload" size={width / 15} color={'#012f6c'} />
                     </TouchableOpacity>
                 </View>
@@ -112,11 +134,16 @@ export default function Receipts({ navigation }) {
                         receipt: val
                     })} key={index} style={{ backgroundColor: "#3f77c8", marginTop: 10, padding: 10, borderRadius: 8, marginHorizontal: 20 }}>
                         <Text style={{ color: "white" }}>Receipt No.: {val.INV_NO}</Text>
-                        <Text style={{ color: "white" }}>{val.REC_DATE}</Text>
+                        <Text style={{ color: "white" }}>{val.REC_DATE ? formatDate2(new Date(val.REC_DATE)) : "DD/MM/YYYY"}</Text>
                         <Text style={{ color: "white" }}>Amount: {val.TOTAL_AMOUNT}</Text>
                     </TouchableOpacity>
                 })}
             </ScrollView>
+            <View style={{ padding: 5, justifyContent: 'center', alignItems: "center", marginBottom: 10 }}>
+                <TouchableOpacity onPress={() => navigation.navigate("AllReceipt")} style={{ padding: 5, maxWidth: 300, width: '100%', backgroundColor: "#012f6c", borderRadius: 8 }}>
+                    <Text style={{ textAlign: "center", color: 'white', fontSize: width / 20 }}>View ALL</Text>
+                </TouchableOpacity>
+            </View>
             <Modal transparent={true} visible={onLogOut} style={{ position: 'absolute', width: '100%' }}>
                 <View style={{ backgroundColor: 'rgba(0,0,0,0.5)', flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <View style={{ backgroundColor: 'white', padding: 20, margin: 20, borderRadius: 8, alignItems: 'center' }}>

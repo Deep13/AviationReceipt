@@ -31,7 +31,7 @@ const Home = ({ navigation, route }) => {
     const [Remove, setRemove] = useState(false);
     const [query, setQuery] = useState('');
 
-    const Receiptstatus = [{ key: '3', desc: "Ready" }, { key: '2', desc: "Pending" }]
+    const Receiptstatus = [{ key: '3', desc: "Ready" }, { key: '2', desc: "Draft" }]
     const [receiptModal, setreceiptModal] = useState({
         "ReceiptParameters": {
             "REC_DATE": "",
@@ -60,14 +60,16 @@ const Home = ({ navigation, route }) => {
             "UNIT_COST": "",
             "EXCH_ID": "92",
             "EXCH_RATE": "",
-            "EXCH_ID_TEXT": "US DOLLAR"
+            "EXCH_ID_TEXT": "US DOLLAR",
+            "CALL_SIGN": "",
+            "TRIP_NUMBER": "",
         }
     });
     const handleSearch = text => {
         console.log('search text', text)
         const formattedQuery = text.toLowerCase();
         const filteredData = fullCurrency.filter(user => {
-            return user.LOOKUP_DESC.toLowerCase().includes(formattedQuery);
+            return user.LOOKUP_CODE.toLowerCase().includes(formattedQuery);
         });
         console.log('filtered', filteredData)
 
@@ -172,6 +174,24 @@ const Home = ({ navigation, route }) => {
                 break;
         }
 
+    };
+    const formatDate2 = (inputDate) => {
+
+        let day = inputDate.getDate();
+
+        let month = inputDate.getMonth() + 1;
+
+        let year = inputDate.getFullYear();
+        if (day < 10) {
+            day = '0' + day;
+        }
+
+        if (month < 10) {
+            month = `0${month}`;
+        }
+
+        let formatted = `${day}/${month}/${year}`;
+        return formatted;
     };
     const onPressDocPreA_New = async (res) => {
         setloading(false);
@@ -307,7 +327,7 @@ const Home = ({ navigation, route }) => {
                                         "PAY_MODE_TEXT": receipt.PAY_MODE_DESC,
                                         "EXCH_ID": receipt.EXCH_ID,
                                         "EXCH_ID_TEXT": receipt.EXCH_DESC,
-                                        "EXCH_RATE": receipt.EXCH_RATE.toString(),
+                                        "EXCH_RATE": receipt.EXCH_RATE?.toString(),
                                         "UID": receipt.UID,
                                         "INV_NO": receipt.INV_NO,
                                         "INV_TYPE": receipt.INV_TYPE,
@@ -316,7 +336,7 @@ const Home = ({ navigation, route }) => {
                                         "OPCO": "3",
                                         "STATUS": "0",
                                         "UPDATE_BY": receipt.UPDATE_BY,
-                                        "EXCH_COST": receipt.EXCH_COST.toString(),
+                                        "EXCH_COST": receipt.EXCH_COST?.toString(),
                                         "COMPLETED": receipt.COMPLETED,
                                         "COMPLETED_DESC": receipt.COMPLETED_DESC,
                                         "UploadDocs": dataFIle.length > 0 ? dataFIle : []
@@ -324,10 +344,12 @@ const Home = ({ navigation, route }) => {
                                     "ReceiptDetailParameters": {
                                         "UID": data[0].UID,
                                         "DESCRIPTION": data[0].DESC_ENG,
-                                        "UNIT_COST": data[0].UNIT_COST.toString(),
+                                        "UNIT_COST": data[0].UNIT_COST?.toString(),
                                         "EXCH_ID": data[0].CUR_ID,
-                                        "EXCH_RATE": data[0].CUR_RATE.toString(),
-                                        "EXCH_ID_TEXT": data[0].CURRENCY_DESC
+                                        "EXCH_RATE": data[0].CUR_RATE?.toString(),
+                                        "EXCH_ID_TEXT": data[0].CURRENCY_DESC,
+                                        "CALL_SIGN": "",
+                                        "TRIP_NUMBER": "",
                                     }
                                 });
 
@@ -374,7 +396,9 @@ const Home = ({ navigation, route }) => {
                     "UNIT_COST": "",
                     "EXCH_ID": "92",
                     "EXCH_RATE": "",
-                    "EXCH_ID_TEXT": "US DOLLAR"
+                    "EXCH_ID_TEXT": "US DOLLAR",
+                    "CALL_SIGN": "",
+                    "TRIP_NUMBER": "",
                 }
             })
         }
@@ -438,7 +462,9 @@ const Home = ({ navigation, route }) => {
                 "UNIT_COST": "",
                 "EXCH_ID": "",
                 "EXCH_RATE": "",
-                "EXCH_ID_TEXT": ""
+                "EXCH_ID_TEXT": "",
+                "CALL_SIGN": "",
+                "TRIP_NUMBER": "",
             }
         })
     }
@@ -490,14 +516,17 @@ const Home = ({ navigation, route }) => {
     const postData = () => {
         setloading(true);
         var domain = getDomain();
-        console.log("receiptModal", JSON.stringify(receiptModal));
+        var postData = { ...receiptModal };
+
+        postData.ReceiptParameters.REMARK = postData.ReceiptParameters.REMARK + `\nCall Sign : ` + postData.ReceiptDetailParameters.CALL_SIGN + `\nTrip Number: ` + postData.ReceiptDetailParameters.TRIP_NUMBER;
+        console.log("receiptModal", JSON.stringify(postData));
         var myHeaders = new Headers();
         myHeaders.append('Accept', 'application/json');
         myHeaders.append("Content-Type", "application/json");
         var requestOptions = {
             method: 'POST',
             headers: myHeaders,
-            body: JSON.stringify(receiptModal)
+            body: JSON.stringify(postData)
         };
         fetch(
             `${domain}/PostReceipt`,
@@ -540,7 +569,7 @@ const Home = ({ navigation, route }) => {
                     <View style={{ flexDirection: 'column' }}>
                         <Text style={{ color: "#012f6c" }}>Enter Date*</Text>
                         <TouchableOpacity onPress={() => setOpen(true)} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5 }}>
-                            <Text style={{ color: receiptModal.ReceiptParameters.REC_DATE ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25 }}>{receiptModal.ReceiptParameters.REC_DATE ? receiptModal.ReceiptParameters.REC_DATE : "DD/MM/YYYY"}</Text>
+                            <Text style={{ color: receiptModal.ReceiptParameters.REC_DATE ? 'black' : 'rgba(0,0,0,0.4)', fontSize: width / 25 }}>{receiptModal.ReceiptParameters.REC_DATE ? formatDate2(new Date(receiptModal.ReceiptParameters.REC_DATE)) : "DD/MM/YYYY"}</Text>
                         </TouchableOpacity>
                         <DatePicker
                             modal
@@ -574,6 +603,26 @@ const Home = ({ navigation, route }) => {
                             ReceiptParameters: {
                                 ...prevModal.ReceiptParameters,
                                 INVOICE_DOC: text
+                            }
+                        }))} placeholder='Enter receipt number' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
+                    </View>
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={{ color: "#012f6c" }}>Enter Call Sign*</Text>
+                        <TextInput value={receiptModal.ReceiptDetailParameters.CALL_SIGN} onChangeText={text => setreceiptModal((prevModal) => ({
+                            ...prevModal,
+                            ReceiptDetailParameters: {
+                                ...prevModal.ReceiptDetailParameters,
+                                CALL_SIGN: text
+                            }
+                        }))} placeholder='Enter receipt number' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
+                    </View>
+                    <View style={{ flexDirection: 'column' }}>
+                        <Text style={{ color: "#012f6c" }}>Enter Trip Number*</Text>
+                        <TextInput value={receiptModal.ReceiptDetailParameters.TRIP_NUMBER} onChangeText={text => setreceiptModal((prevModal) => ({
+                            ...prevModal,
+                            ReceiptDetailParameters: {
+                                ...prevModal.ReceiptDetailParameters,
+                                TRIP_NUMBER: text
                             }
                         }))} placeholder='Enter receipt number' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
                     </View>
@@ -663,7 +712,7 @@ const Home = ({ navigation, route }) => {
                                 ...prevModal.ReceiptDetailParameters,
                                 DESCRIPTION: text
                             }
-                        }))} placeholder='Enter description' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
+                        }))} placeholder='Enter merchant' placeholderTextColor={'rgba(0,0,0,0.4)'} style={{ marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", paddingVertical: 10, paddingLeft: 5, fontSize: width / 25, color: "black" }} />
                     </View>
 
                     <View style={{ flexDirection: 'column' }}>
@@ -698,7 +747,7 @@ const Home = ({ navigation, route }) => {
                         </View>
                     })}
                     <View style={{ flexDirection: 'column', marginTop: 20 }}>
-                        <Text style={{ color: "#012f6c" }}>Select Completion Status</Text>
+                        <Text style={{ color: "#012f6c" }}>Select Outstanding Status</Text>
                         <TouchableOpacity onPress={() => setstatusModal(true)} style={{
                             backgroundColor: "rgb(255,255,255)", marginVertical: 10, borderRadius: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.3)", padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
                         }}>
@@ -798,7 +847,7 @@ const Home = ({ navigation, route }) => {
                                         borderBottomWidth: 2,
                                     }}>
                                     <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'center' }}>
-                                        {val.LOOKUP_DESC}
+                                        {`${val.LOOKUP_CODE}`}
                                     </Text>
                                 </TouchableOpacity>
                             })
@@ -880,7 +929,7 @@ const Home = ({ navigation, route }) => {
                                         borderBottomWidth: 2,
                                     }}>
                                     <Text style={{ color: '#012f6c', fontSize: width / 15, textAlign: 'center' }}>
-                                        {val.LOOKUP_DESC}
+                                        {`${val.LOOKUP_CODE}`}
                                     </Text>
                                 </TouchableOpacity>
                             })
